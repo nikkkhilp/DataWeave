@@ -21,3 +21,10 @@ class CanonicalDocument:
     def to_dict(self) -> dict :
         return asdict(self)
 
+@dataclass
+class TextSpan:
+    text: str
+    font: str | None = None
+    size: float | None = None
+    flags: int = 0
+    bbox: tuple[float, float, float, float] | None = None
