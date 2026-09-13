@@ -5,7 +5,10 @@ from dataweave.core.models import (CanonicalDocument,
                                        Element,
                                        NormalizedBlock,
                                        NormalizedLine,
-                                       TextSpan)
+                                       TextSpan,
+                                       LineFeatures,
+                                       LineClassification,
+                                       ClassifiedLine)
 
 """def test_pdf_processor_extracts_text():
     pdf_path = Path("tests/fixtures/sample_pdf_1.pdf")
@@ -144,7 +147,7 @@ def test_process():
     assert "flags" in span
     assert "bbox" in span
 
-"""
+
 def test_process():
     pdf_path  = Path("tests/fixtures/sample_pdf_1.pdf")
     processor = PDFProcessor()
@@ -152,3 +155,184 @@ def test_process():
     doc_dict  = document.to_dict()
 
     print(json.dumps(doc_dict, indent=4, default=str))
+
+
+def test_extract_line_features():
+    pdf_path = Path("tests/fixtures/sample_pdf_1.pdf")
+
+    pdf = pymupdf.open(pdf_path)
+    page = pdf[0]
+
+    processor = PDFProcessor()
+    blocks = processor._extract_page_blocks(page)
+
+    line = blocks[0].lines[0]
+
+    features = processor._extract_line_features(line)
+
+    pdf.close()
+
+    assert isinstance(features, LineFeatures)
+    assert features.text
+    assert features.bbox
+    assert features.font_sizes
+    assert features.fonts
+    assert features.text_length > 0
+
+
+def test_classify_line():
+    pdf_path = Path("tests/fixtures/sample_pdf_1.pdf")
+
+    pdf = pymupdf.open(pdf_path)
+    page = pdf[0]
+
+    processor = PDFProcessor()
+
+    blocks = processor._extract_page_blocks(page)
+
+    lines = []
+
+    for block in blocks:
+        for line in block.lines:
+            features = processor._extract_line_features(line)
+            if features.text:
+                lines.append(features)
+
+    stats = processor._build_document_stats(lines)
+
+    classification = processor.classify_line(
+        lines[0],
+        stats,
+    )
+
+    pdf.close()
+
+    assert isinstance(classification, LineClassification)
+    assert classification.type
+    assert 0 <= classification.confidence <= 1
+    assert classification.reasons
+
+
+def test_group_lines():
+    pdf_path = Path("tests/fixtures/sample_pdf_1.pdf")
+
+    pdf = pymupdf.open(pdf_path)
+    processor = PDFProcessor()
+
+    page = pdf[0]
+    blocks = processor._extract_page_blocks(page)
+
+    lines = []
+
+    for block in blocks:
+        for line in block.lines:
+            features = processor._extract_line_features(line)
+
+            if features.text:
+                lines.append(features)
+
+    stats = processor._build_document_stats(lines)
+
+    classified_lines = [
+        ClassifiedLine(
+            features=line,
+            classification=processor.classify_line(line, stats),
+        )
+        for line in lines
+    ]
+
+    elements = processor._group_lines(
+        classified_lines,
+        page=1,
+    )
+
+    pdf.close()
+
+    for element in elements:
+        print("\n---", element.type, "---")
+        print(element.content)
+        print("confidence:", element.confidence)
+
+    assert elements
+
+
+def test_add_positional_features():
+    lines = [
+        LineFeatures(
+            text="Heading",
+            bbox=(10, 10, 200, 30),
+        ),
+        LineFeatures(
+            text="Paragraph",
+            bbox=(10, 50, 300, 70),
+        ),
+    ]
+
+    processor = PDFProcessor()
+    processor._add_positional_features(lines)
+
+    assert lines[0].x_pos == 10
+    assert lines[0].y_pos == 10
+    assert lines[0].space_after == 20
+
+    assert lines[1].space_before == 20
+
+ 
+
+def test_add_indentation_features():
+    lines = [
+        LineFeatures(
+            text="Normal",
+            bbox=(10, 10, 100, 30),
+        ),
+        LineFeatures(
+            text="Indented",
+            bbox=(30, 40, 120, 60),
+        ),
+    ]
+
+    processor = PDFProcessor()
+    processor._add_indentation_features(lines)
+
+    assert lines[0].indentation == 0
+    assert lines[1].indentation == 20
+"""
+
+
+
+def test_build_line_features():
+    pdf_path = Path("tests/fixtures/sample_pdf_1.pdf")
+
+    pdf = pymupdf.open(pdf_path)
+
+    processor = PDFProcessor()
+
+    blocks = processor._extract_page_blocks(pdf[0])
+
+    normalized_lines = [
+        line
+        for block in blocks
+        for line in block.lines
+    ]
+
+    features = processor._build_line_features(normalized_lines)
+
+    pdf.close()
+
+    for feature in features:
+        print(
+            f"\nTEXT: {feature.text!r}"
+            f"\n  font_sizes: {feature.font_sizes}"
+            f"\n  bold: {feature.is_bold}"
+            f"\n  italic: {feature.is_italic}"
+            f"\n  x: {feature.x_pos}"
+            f"\n  y: {feature.y_pos}"
+            f"\n  before: {feature.space_before}"
+            f"\n  after: {feature.space_after}"
+            f"\n  indentation: {feature.indentation}"
+        )
+
+    assert features
+    assert all(feature.text for feature in features)
+    assert any(feature.space_before is not None for feature in features)
+    assert any(feature.indentation is not None for feature in features)
