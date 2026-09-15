@@ -94,3 +94,18 @@ class SemanticElement:
 class VisualLineGroup:
     lines : list[NormalizedLine] = field(default_factory=list)
     bbox  : tuple[float,float,float,float] | None=None
+
+
+@dataclass
+class LayoutRegion:
+    bbox : tuple[float, float, float, float] | None=None
+    lines: list[NormalizedLine] = field(default_factory=list)
+
+# This will give us - 
+"""
+    Page
+     └── LayoutRegion
+        ├── NormalizedLine
+        ├── NormalizedLine
+        └── NormalizedLine
+"""

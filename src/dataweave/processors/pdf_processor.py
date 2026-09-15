@@ -380,6 +380,22 @@ class PDFProcessor(DocumentProcessor):
 
         return groups
 
+    """
+        (x0,y0) ─────────────────── (x1,y0)
+            │                           │
+            │         TEXT              │
+            │                           │
+            │                           │
+        (x0,y1) ─────────────────── (x1,y1)
+
+        BBOX = (x0, y0, x1, y1)
+        
+        x0   = left edge
+        y0   = top edge
+        x1   = right edge
+        y1   = bottom edge
+    """
+
 
     def _same_visual_line(self, first: NormalizedLine, second: NormalizedLine) -> bool:
 
@@ -418,3 +434,72 @@ class PDFProcessor(DocumentProcessor):
         y1 = min(first[3], second[3])
 
         return (x0, y0, x1, y1)
+
+    def _calculate_horizontal_gaps(self, lines: list[NormalizedLine]) -> list[float]:
+
+        gaps: list[float] = []
+
+        for line in lines:
+            spans = sorted(
+                line.spans,
+                key = lambda span: span.bbox[0]
+            )
+            for previous, current in zip(spans, spans[1:]):
+                gap = current.bbox[0] - previous.bbox[2]
+                if gap >= 0:
+                    gaps.append(gap)    
+
+        return gaps
+
+    def _calculate_word_horizontal_gaps(self, page) -> list[float]:
+
+        words = page.get_text("words")
+        gaps: list[float] = []
+
+        # (block num, line num) -> words on that PDF line
+        lines: dict[tuple[int, int], list[tuple]] = {}
+
+        for word in words:
+
+            block_num = word[5]
+            line_num  = word[6]
+            key = (block_num, line_num)
+            lines.setdefault(key, []).append(word)
+
+        for line_words in lines.values():
+
+            line_words.sort(key=lambda word: word[0])
+
+            for previous, current in zip(line_words, line_words[1:]):
+
+                previous_x1 = previous[2]
+                current_x1  = current[0]
+                gap = current_x1 - previous_x1
+                if gap >= 0:
+                    gaps.append(gap)
+
+        return gaps
+
+    def _build_x_occupancy_profile(self, lines: list[NormalizedLine],
+                                   page_width: float, bucket_size: float = 10.0) -> list[int]:
+
+        if not lines:
+            return []
+
+        bucket_count = int(page_width/bucket_size) +1
+        occupancy    = [0]*bucket_count 
+        # Creates a list occupancy with value 0s and numebr of element same as bucket_count
+        
+        for line in lines:
+
+            if line.bbox is None:
+                continue
+            x0, _, x1, _ = line.bbox
+            start_bucket = int(x0/bucket_size)
+            end_bucket   = int(x1/bucket_size)
+
+            for bucket in range(start_bucket, end_bucket+1):
+                if 0 <= bucket < bucket_count:
+                    occupancy[bucket] += 1
+
+        return occupancy
