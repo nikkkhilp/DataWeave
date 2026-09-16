@@ -296,7 +296,7 @@ def test_add_indentation_features():
 
     assert lines[0].indentation == 0
     assert lines[1].indentation == 20
-"""
+
 
 
 
@@ -336,3 +336,65 @@ def test_build_line_features():
     assert all(feature.text for feature in features)
     assert any(feature.space_before is not None for feature in features)
     assert any(feature.indentation is not None for feature in features)
+
+
+def test_calculate_horizontal_gaps():
+    pdf_path = Path("tests/fixtures/sample_pdf_1.pdf")
+
+    pdf = pymupdf.open(pdf_path)
+    processor = PDFProcessor()
+    page = pdf[0]
+
+    words = page.get_text("words")
+    print(len(words))
+
+
+def test_calculate_word_horizontal_gaps():
+    pdf_path = Path("tests/fixtures/sample_pdf_1.pdf")
+
+    pdf = pymupdf.open(pdf_path)
+    processor = PDFProcessor()
+
+    gaps = processor._calculate_word_horizontal_gaps(pdf[0])
+
+    print("Number of word gaps:", len(gaps))
+    print(
+        "Largest word gaps:",
+        sorted(gaps, reverse=True)[:20],
+    )
+
+    pdf.close()
+
+    assert gaps
+    assert all(gap >= 0 for gap in gaps)
+
+"""
+def test_build_x_occupancy_profile():
+    pdf_path = Path("tests/fixtures/sample_pdf_2.pdf")
+
+    pdf = pymupdf.open(pdf_path)
+    processor = PDFProcessor()
+
+    page = pdf[0]
+
+    blocks = processor._extract_page_blocks(page)
+
+    lines = [
+        line
+        for block in blocks
+        for line in block.lines
+    ]
+
+    profile = processor._build_x_occupancy_profile(
+        lines,
+        page_width=page.rect.width,
+    )
+
+    assert profile
+    assert any(value > 0 for value in profile)
+
+    print("Page width:", page.rect.width)
+    print("Bucket count:", len(profile))
+    print("Occupancy:", profile)
+
+    pdf.close()
