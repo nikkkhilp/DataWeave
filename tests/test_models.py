@@ -1,5 +1,5 @@
 import json
-from dataweave.core.models import Element, CanonicalDocument
+from dataweave.core.models import Element, CanonicalDocument, Provenance
 
 """
 def test_document_to_dict():
@@ -59,5 +59,81 @@ def test_element_provenance():
 
     assert element.source["document_id"] == "doc_001"
     assert element.source["page"] == 4
+
+
+def test_canonical_document_can_contain_elements():
+    element = Element(
+        element_id="e1",
+        type="paragraph",
+        content="Hello world",
+        page=1,
+    )
+
+    document = CanonicalDocument(
+        document_id="doc1",
+        source="test.pdf",
+        elements=[element],
+    )
+
+    assert document.document_id == "doc1"
+    assert document.source == "test.pdf"
+    assert len(document.elements) == 1
+    assert document.elements[0].content == "Hello world"
+
+    
+
+def test_canonical_document_to_dict():
+    element = Element(
+        element_id="e1",
+        type="paragraph",
+        content="Hello world",
+        page=1,
+    )
+
+    document = CanonicalDocument(
+        document_id="doc1",
+        source="test.pdf",
+        elements=[element],
+    )
+
+    result = document.to_dict()
+
+    assert result["document_id"] == "doc1"
+    assert result["elements"][0]["content"] == "Hello world"
+
+
+
+def test_provenance():
+    provenance = Provenance(
+        document_id="doc1",
+        page=2,
+        parser="pymupdf",
+    )
+
+    assert provenance.document_id == "doc1"
+    assert provenance.page == 2
+    assert provenance.parser == "pymupdf"
+
+
+def test_element_can_have_provenance():
+    provenance = Provenance(
+        document_id="doc1",
+        page=2,
+        parser="pymupdf",
+    )
+
+    element = Element(
+        element_id="e1",
+        type="paragraph",
+        content="Hello world",
+        metadata={"metadata":"doc1"},
+        raw={"raw":"raw"},
+        source=provenance,
+    )
+
+    assert element.source is provenance
+    assert element.source.document_id == "doc1"
+    assert element.source.page == 2
+    assert element.source.parser == "pymupdf"
 
 """

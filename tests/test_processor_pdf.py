@@ -1,4 +1,4 @@
-import pymupdf, json
+import pymupdf, json, pytest
 from pathlib import Path, WindowsPath
 from dataweave.processors.pdf_processor import PDFProcessor
 from dataweave.core.models import (CanonicalDocument,
@@ -8,7 +8,10 @@ from dataweave.core.models import (CanonicalDocument,
                                        TextSpan,
                                        LineFeatures,
                                        LineClassification,
-                                       ClassifiedLine)
+                                       ClassifiedLine,
+                                       Provenance,
+                                       RawEvidence)
+from dataweave.core.exceptions import ProcessingError 
 
 """def test_pdf_processor_extracts_text():
     pdf_path = Path("tests/fixtures/sample_pdf_1.pdf")
@@ -368,7 +371,7 @@ def test_calculate_word_horizontal_gaps():
     assert gaps
     assert all(gap >= 0 for gap in gaps)
 
-"""
+
 def test_build_x_occupancy_profile():
     pdf_path = Path("tests/fixtures/sample_pdf_2.pdf")
 
@@ -398,3 +401,75 @@ def test_build_x_occupancy_profile():
     print("Occupancy:", profile)
 
     pdf.close()
+
+
+def test_element_can_have_provenance():
+    provenance = Provenance(
+        document_id="doc1",
+        page=2,
+        parser="pymupdf",
+    )
+
+    element = Element(
+        element_id="e1",
+        type="paragraph",
+        content="Hello world",
+        source=provenance,
+    )
+
+    assert element.source is provenance
+    assert element.source.document_id == "doc1"
+    assert element.source.page == 2
+    assert element.source.parser == "pymupdf"
+
+def test_element_metadata_and_raw_are_separate():
+    raw = RawEvidence(
+        parser="pymupdf",
+        data={"blocks": []},
+    )
+
+    element = Element(
+        element_id="e1",
+        type="paragraph",
+        content="Hello world",
+        metadata={"confidence": 0.95},
+        raw=raw,
+    )
+
+    assert element.metadata["confidence"] == 0.95
+    assert element.raw.parser == "pymupdf"
+    assert "confidence" not in element.raw.data
+
+
+def test_process_missing_file_raises_processing_error():
+    processor = PDFProcessor()
+
+    with pytest.raises(ProcessingError):
+        processor.process("does_not_exist.pdf")
+
+
+def test_process_invalid_pdf_raises_processing_error(tmp_path):
+    invalid_pdf = tmp_path / "invalid.pdf"
+    invalid_pdf.write_text("this is not a real PDF")
+
+    processor = PDFProcessor()
+
+    with pytest.raises(ProcessingError):
+        processor.process(str(invalid_pdf))
+
+
+
+def test_pdf_processor_can_process_only_pdf():
+    processor = PDFProcessor()
+
+    assert processor.can_process("document.pdf")
+    assert processor.can_process("DOCUMENT.PDF")
+
+    assert not processor.can_process("document.docx")
+    assert not processor.can_process("image.png")
+"""
+
+def test_pdf_processor_uses_default_config():
+    processor = PDFProcessor()
+
+    assert processor.config.strict is False

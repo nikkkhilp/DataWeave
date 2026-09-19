@@ -3,14 +3,35 @@ import json
 
 
 @dataclass
+class RawEvidence:
+    parser: str
+    data: dict = field(default_factory=dict)
+
+
+@dataclass
+class Provenance:
+    document_id: str
+    page: int | None=None
+    parser: str | None=None
+
+@dataclass
 class Element:
     element_id: str
     type: str
     content: str
-    page: int
-    raw: dict = field(default_factory=dict)
     metadata: dict = field(default_factory=dict)
-    source: dict = field(default_factory=dict)
+    raw: RawEvidence | None=None
+    source: Provenance | None=None
+
+"""
+    Provenance
+        ↓
+    "Where did this information come from?"
+
+    Raw evidence
+        ↓
+    "What exactly did the parser give us?"
+"""
 
 @dataclass
 class CanonicalDocument:
@@ -21,6 +42,7 @@ class CanonicalDocument:
 
     def to_dict(self) -> dict :
         return asdict(self)
+
 
 @dataclass
 class TextSpan:
