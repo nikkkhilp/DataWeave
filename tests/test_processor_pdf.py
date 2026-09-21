@@ -12,6 +12,7 @@ from dataweave.core.models import (CanonicalDocument,
                                        Provenance,
                                        RawEvidence)
 from dataweave.core.exceptions import ProcessingError 
+from dataweave.core.raw        import (RawPage, RawBlock, RawLine, RawSpan) 
 
 """def test_pdf_processor_extracts_text():
     pdf_path = Path("tests/fixtures/sample_pdf_1.pdf")
@@ -467,9 +468,134 @@ def test_pdf_processor_can_process_only_pdf():
 
     assert not processor.can_process("document.docx")
     assert not processor.can_process("image.png")
-"""
 
-def test_pdf_processor_uses_default_config():
+
+def test_extract_page_blocks_returns_raw_models():
     processor = PDFProcessor()
 
-    assert processor.config.strict is False
+    pdf_path = "tests/fixtures/sample_pdf_1.pdf"
+
+    with pymupdf.open(pdf_path) as pdf:
+        blocks = processor._extract_page_blocks(pdf[0])
+
+    assert blocks
+
+    block = blocks[0]
+
+    assert isinstance(block, RawBlock)
+    assert block.block_num == 1
+    assert block.bbox is not None
+
+
+def test_extract_page_blocks_returns_raw_models():
+    processor = PDFProcessor()
+
+    pdf_path = "tests/fixtures/sample_pdf_1.pdf"
+
+    with pymupdf.open(pdf_path) as pdf:
+        blocks = processor._extract_page_blocks(pdf[0])
+
+    assert blocks
+
+    block = blocks[0]
+
+    assert isinstance(block, RawBlock)
+    assert block.block_num == 1
+    assert block.bbox is not None
+
+def test_raw_block_contains_lines_and_spans():
+    processor = PDFProcessor()
+
+    pdf_path = "tests/fixtures/sample_pdf_1.pdf"
+
+    with pymupdf.open(pdf_path) as pdf:
+        blocks = processor._extract_page_blocks(pdf[0])
+
+    text_block = next(
+        block for block in blocks
+        if block.lines and block.lines[0].spans
+    )
+
+    line = text_block.lines[0]
+    span = line.spans[0]
+
+    assert isinstance(line, RawLine)
+    assert isinstance(span, RawSpan)
+
+    assert span.text
+    assert span.bbox is not None 
+
+def test_raw_page():
+    page = RawPage(
+        page_num=1,
+        width=595.0,
+        height=842.0,
+        rotation=0,
+    )
+
+    assert page.page_num == 1
+    assert page.width == 595.0
+    assert page.height == 842.0
+    assert page.rotation == 0
+
+
+def test_canonical_document_can_have_raw_evidence():
+    raw_page = RawPage(
+        page_num=1,
+        width=595.0,
+        height=842.0,
+    )
+
+    raw = RawEvidence(
+        parser="pymupdf",
+        pages=[raw_page],
+    )
+
+    document = CanonicalDocument(
+        document_id="doc1",
+        source="doc.pdf",
+        raw=raw,
+    )
+
+    assert document.raw.parser == "pymupdf"
+    assert document.raw.pages[0].page_num == 1
+
+
+def test_process_creates_document_level_raw_evidence():
+    processor = PDFProcessor()
+
+    document = processor.process(
+        "tests/fixtures/sample_pdf_1.pdf"
+    )
+
+    assert document.raw is not None
+    assert document.raw.parser == "pymupdf"
+    assert len(document.raw.pages) == 2
+
+    page = document.raw.pages[0]
+
+    assert page.page_num == 1
+    assert page.width > 0
+    assert page.height > 0
+    assert page.blocks
+"""
+def test_raw_evidence_preserves_block_line_span_hierarchy():
+    processor = PDFProcessor()
+
+    document = processor.process(
+        "tests/fixtures/sample_pdf_1.pdf"
+    )
+
+    page = document.raw.pages[0]
+
+    text_block = next(
+        block
+        for block in page.blocks
+        if block.lines and block.lines[0].spans
+    )
+
+    line = text_block.lines[0]
+    span = line.spans[0]
+
+    assert span.text
+    assert span.bbox is not None

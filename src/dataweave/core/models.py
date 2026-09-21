@@ -1,44 +1,41 @@
+from dataweave.core.raw import RawEvidence
 from dataclasses import dataclass, field, asdict
 import json
-
-
-@dataclass
-class RawEvidence:
-    parser: str
-    data: dict = field(default_factory=dict)
-
 
 @dataclass
 class Provenance:
     document_id: str
     page: int | None=None
     parser: str | None=None
+    source_ref: str | None=None
+
 
 @dataclass
 class Element:
     element_id: str
     type: str
     content: str
+    parent_id: str | None=None
+    children_ids: list[str] = field(default_factory=list)
+    bbox: tuple[float, float, float, float] | None=None
     metadata: dict = field(default_factory=dict)
-    raw: RawEvidence | None=None
     source: Provenance | None=None
 
-"""
-    Provenance
-        ↓
-    "Where did this information come from?"
-
-    Raw evidence
-        ↓
-    "What exactly did the parser give us?"
-"""
+@dataclass
+class Page:
+    page_number: int
+    width: float | None=None
+    height: float | None=None
+    element_ids: list[str] = field(default_factory=list)
 
 @dataclass
 class CanonicalDocument:
     document_id: str
     source: str
     metadata: dict = field(default_factory=dict)
+    pages: list[Page] = field(default_factory=list)
     elements: list[Element] = field(default_factory=list)
+    raw: RawEvidence | None=None
 
     def to_dict(self) -> dict :
         return asdict(self)

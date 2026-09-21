@@ -14,6 +14,11 @@ from dataweave.core.models     import (CanonicalDocument,
                                        VisualLineGroup,
                                        Provenance,
                                        RawEvidence)
+from dataweave.core.raw         import (    RawPage,
+                                            RawBlock,
+                                            RawLine,
+                                            RawSpan,
+                                        )
 from dataweave.processors.base import DocumentProcessor
 from dataweave.core.config     import ProcessorConfig
 
@@ -39,96 +44,84 @@ class PDFProcessor(DocumentProcessor):
                 document_id = file_path,
                 source      = file_path,
             )
+            raw_pages = []
             for page_number, page in enumerate(pdf, start=1):
 
-                blocks = self._extract_page_blocks(page)
-                raw_blocks   = []
                 page_content = []
+                raw_page = RawPage(
+                    page_num = page_number,
+                    width    = page.rect.width,
+                    height   = page.rect.height,
+                    rotation = page.rotation,
+                    blocks   = self._extract_page_blocks(page)
+                )
+                raw_pages.append(raw_page)
 
-                for block_index, block in enumerate(blocks, start=1):
-
-                    raw_block = {
-                        "block_num"  : block_index,
-                        "block_type" : block.block_type,
-                        "bbox"       : block.bbox,
-                        "lines"      : []
-                    }
-
-                    for line_index, line in enumerate(block.lines, start=1):
-
-                        raw_line = {
-                            "line_num" : line_index,
-                            "bbox"     : line.bbox,
-                            "spans"    : []
-                        }
-                        
+                for block in raw_page.blocks:
+                    for line in block.lines:
                         for span in line.spans:
-
-                            if not span.text:
-                                continue
                             page_content.append(span.text)
-                            raw_line["spans"].append({
-                                "text"  : span.text,
-                                "font"  : span.font,
-                                "size"  : span.size,
-                                "flags" : span.flags,
-                                "bbox"  : span.bbox
-                            })
-                        raw_block["lines"].append(raw_line)
-                    raw_blocks.append(raw_block)
+
                 element = Element(
-                    element_id = f"{file_path}__page__{page_number}",
-                    type       = "raw_text",
-                    content    = "\n".join(page_content),
-                    metadata   = {
-                        "total_blocks" : len(blocks)
+                    element_id      = f"{file_path}__PAGE__{page_number}",
+                    type            = "raw_text",
+                    content         = "\n".join(page_content),
+                    metadata        = {
+                        "total_blocks" : len(raw_page.blocks)
                     },
-                    source      = Provenance(
+                    source          = Provenance(
                         document_id = file_path,
                         page        = page_number,
                         parser      = "pymupdf"
-                    ),
-                    raw         = RawEvidence(
-                        parser="pymupdf",
-                        data   ={
-                            "blocks":raw_blocks
-                        }
-                    )
+                    )             
                 )
                 document.elements.append(element)
-        pdf.close()
+        document.raw = RawEvidence(
+            parser = "pymupdf",
+            pages  = raw_pages
+        )
         return document
 
 
 
-    def _extract_page_blocks(self, page) -> list[NormalizedBlock]:
-        data = page.get_text("dict")
-        blocks=[]
+    def _extract_page_blocks(self, page) -> list[RawBlock]:
 
-        for block in data["blocks"]:
-            normalized_block = NormalizedBlock(
-                block_type   = block["type"],
-                bbox         = tuple(block["bbox"]) if block.get("bbox") else None 
+        blocks=[]
+        raw_blocks = page.get_text("dict")["blocks"]
+
+
+        for block_index, block in enumerate(raw_blocks, start=1):
+
+            raw_block = RawBlock(
+                block_num    = block_index,
+                block_type   = block.get("type"),
+                bbox         = tuple(block["bbox"]) if "bbox" in block else None 
             )
 
-            for line in block.get("lines", []):
-                normalized_line = NormalizedLine(
-                    bbox        = tuple(line["bbox"]) if line.get("bbox") else None
+            for line_index, line in enumerate(block.get("lines", []), start=1):
+
+                raw_line = RawLine(
+                    line_num = line_index,
+                    bbox     = tuple(line["bbox"]) if "bbox" in line else None
                 )                    
 
                 for span in line.get("spans", []):
-                    normalized_line.spans.append(
-                        TextSpan(
-                            text = span["text"],
+
+                    text = span.get("text", "")
+                    if not text:
+                        continue
+
+                    raw_line.spans.append(
+                        RawSpan(
+                            text = text,
                             font = span.get("font"),
                             size = span.get("size"),
-                            flags= span.get("flags", 0),
-                            bbox = tuple(span["bbox"]) if span.get("bbox") else None
+                            flags= span.get("flags"),
+                            bbox = tuple(span["bbox"]) if "bbox" in span else None
                         )
                     )
-                normalized_block.lines.append(normalized_line)
-            blocks.append(normalized_block)
-
+                raw_block.lines.append(raw_line)
+            blocks.append(raw_block)
         return blocks
 
 
