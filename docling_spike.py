@@ -8,21 +8,29 @@ def main():
     result    = converter.convert(PDF_PATH)
     document  = result.document
 
-    print("DOCUMENT TYPE : ")
-    print(type(document))
+    inspect_body_reference(document)
 
-    print("\nDOCUMENT ATTRIBUTES : ")
-    print([name for name in dir(document) if not name.startswith("_")])
+def inspect_body_reference(docling_document):
+    items_by_ref = {}
+    
+    for item in docling_document.texts:
+        print("TEXT : ", item.self_ref)
+        items_by_ref[item.self_ref] = item
 
-    print("\nDOCUMENT ITEMS : ")
-    for index, item_data in enumerate(document.iterate_items()):
-        print(f"\n{'=' * 60}")
-        print(f"ITEM {index}")
-        print("Tuple length:", len(item_data))
-        print("Tuple:", item_data)
+    print("\nLOOKUP TYPE : ", type(items_by_ref))
+    
+    ref = docling_document.body.children[0]
+    print("\nREFERENCE : ")
+    print(ref.cref)
+    print("\nRESOLVED : ")
+    print(items_by_ref[ref.cref])
 
-        if index >= 9:
-            break
+
+def inspect_body_order(docling_document):
+    print("\n=== BODY CHILDREN ORDER ===\n")
+    for index, ref in enumerate(docling_document.body.children):
+        print(index, ref.cref)
+    print("\n=== END ===\n")
 
 def inspect_item(item, index):
     print(f"\n{'n'*60}")
