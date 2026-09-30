@@ -11,19 +11,10 @@ def main():
     inspect_body_reference(document)
 
 def inspect_body_reference(docling_document):
-    items_by_ref = {}
-    
-    for item in docling_document.texts:
-        print("TEXT : ", item.self_ref)
-        items_by_ref[item.self_ref] = item
-
-    print("\nLOOKUP TYPE : ", type(items_by_ref))
-    
-    ref = docling_document.body.children[0]
-    print("\nREFERENCE : ")
-    print(ref.cref)
-    print("\nRESOLVED : ")
-    print(items_by_ref[ref.cref])
+    for page_num, page in docling_document.pages.items():
+        print(page_num,
+              page.size.width,
+              page.size.height)
 
 
 def inspect_body_order(docling_document):

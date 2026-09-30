@@ -116,7 +116,7 @@ class DoclingAdapter:
 
         items_by_ref  = self._build_item_lookup(docling_document) 
         
-        ordered_items = self._walk_items(docling_document, items_by_ref) 
+        ordered_items = self._walk_items(docling_document.body, items_by_ref) 
 
         body_ids = docling_document.body.self_ref
 

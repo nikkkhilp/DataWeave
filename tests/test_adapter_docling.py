@@ -28,6 +28,16 @@ def get_document():
 def test_docling_adapter_creates_canonical_document():
     document = get_document()
 
+    document = get_document()
+
+    for i, element in enumerate(document.elements):
+        print(
+            i,
+            element.element_id,
+            element.type,
+            repr(element.content)
+        )
+
     assert document.document_id == "test-doc"
     assert document.source == str(FIXTURE_PATH)
 
