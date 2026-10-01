@@ -112,18 +112,25 @@ class DoclingAdapter:
             source      = source
         )
 
-        pages: dict[int, Page] = {} 
+        pages: dict[int, Page] = {}
+        for page_number, page in docling_document.page.items:
+            pages[page_number] = Page(
+                page_number = page_number,
+                width       = page.size.width,
+                height      = page.size.height
+            )
 
         items_by_ref  = self._build_item_lookup(docling_document) 
         
         ordered_items = self._walk_items(docling_document.body, items_by_ref) 
-
+        
         body_ids = docling_document.body.self_ref
-
+        
         text_ids = {
             item.self_ref
             for item in docling_document.texts
         }
+        
         group_ids = {
                     item.self_ref
                     for item in docling_document.groups
@@ -150,14 +157,7 @@ class DoclingAdapter:
                 continue
 
             document.elements.append(element)
-            
-            if element.source.page is not None:
-                page_number = element.source.page
-                
-                if page_number not in pages:
-                    pages[page_number] = Page(page_number=page_number)
-
-                pages[page_number].element_ids.append(element.element_id)
+            pages[page_number].element_ids.append(element.element_id)
 
         document.pages = list(pages.values())
         return document
